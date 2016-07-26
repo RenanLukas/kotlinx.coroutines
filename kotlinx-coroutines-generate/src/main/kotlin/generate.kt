@@ -33,6 +33,19 @@ class GeneratorController<T> internal constructor() : AbstractIterator<T>() {
         setNextStep(c)
     }
 
+    suspend fun yieldAll(values: Iterable<T>, c: Continuation<Unit>) {
+        yieldAll(values.iterator(), c)
+    }
+
+    suspend fun yieldAll(values: Sequence<T>, c: Continuation<Unit>) {
+        yieldAll(values.iterator(), c)
+    }
+
+    suspend fun yieldAll(iterator: Iterator<T>, c: Continuation<Unit>) {
+        setNextMultiple(iterator)
+        setNextStep(nextStep)
+    }
+
     operator fun handleResult(result: Unit, c: Continuation<Nothing>) {
         done()
     }
