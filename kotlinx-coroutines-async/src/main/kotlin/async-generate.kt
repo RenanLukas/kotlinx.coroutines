@@ -1,3 +1,4 @@
+import kotlinx.coroutines.async
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
@@ -45,7 +46,7 @@ class AsyncGeneratorController<Element> {
     // must be initialized immediately upon the controller creation
     lateinit var start: Continuation<Unit>
 
-    internal var state = State.READY
+    internal var state = State.INITIAL
 
     private val maybeValue = ArrayList<Element>()
 
@@ -62,11 +63,13 @@ class AsyncGeneratorController<Element> {
 
     // TODO: add sync shortcut for completed tasks
     // TODO: handle cancellation
-    // TODO: handle exceptions
     // This method is available in an asynchronous coroutine
     suspend fun <Result> await(future: CompletableFuture<Result>, continuation: Continuation<Result>): Unit {
         future.whenComplete { result, exception ->
-            continuation.resume(result)
+            if (exception != null)
+                continuation.resumeWithException(exception)
+            else
+                continuation.resume(result)
         }
     }
 
@@ -157,3 +160,49 @@ class AsyncIteratorTask<T>(val controller: AsyncGeneratorController<T>) : AsyncI
 
 private fun <T> ArrayList<T>.push(t: T) = add(t)
 private fun <T> ArrayList<T>.pop() = removeAt(lastIndex)
+
+fun <T> work(t: T) = async<T> {
+    t
+}
+
+fun <T> AsyncSequence<T>.forEach(body: (T) -> Unit): CompletableFuture<Unit> {
+    return async<Unit> {
+        val iterator = iterator()
+        while (await(iterator.hasNext())) {
+            body(iterator.next())
+        }
+    }
+}
+
+fun <T> AsyncSequence<T>.toList(expectedSize: Int = -1): CompletableFuture<List<T>> {
+    return async {
+        val result = if (expectedSize >= 0) ArrayList<T>(expectedSize) else ArrayList()
+        val iterator = iterator()
+        while (await(iterator.hasNext())) {
+            result += iterator.next()
+        }
+        result.trimToSize()
+        result
+    }
+//    forEach {
+//        result += it
+//    }.get()
+//    result.trimToSize()
+//    return result
+}
+
+fun main(args: Array<String>) {
+    println("At least this")
+
+    val ag = asyncGenerate<String> {
+        yield("Start")
+        val first = await(work(1))
+        val second = await(work("second: $first"))
+        yield("Continue")
+        yield(second)
+    }
+
+    ag.forEach {
+        println(it)
+    }.get()
+}
