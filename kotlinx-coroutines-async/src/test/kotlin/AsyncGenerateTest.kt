@@ -12,6 +12,13 @@ import kotlin.test.fail
 
 class AsyncGenerateTest {
     @Test
+    fun testEmpty() {
+        val asyncSequence = asyncGenerate<String> {}
+
+        assertEquals(listOf(), asyncSequence.toList().get())
+    }
+
+    @Test
     fun testSimpleYield() {
         val asyncSequence = asyncGenerate<String> {
             yield("OK")
