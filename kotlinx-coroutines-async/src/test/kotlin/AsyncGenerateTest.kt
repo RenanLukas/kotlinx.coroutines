@@ -1,8 +1,6 @@
 package kotlinx.coroutines
 
-import asyncGenerate
 import org.junit.Test
-import toList
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import kotlin.test.assertEquals

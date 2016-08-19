@@ -1,16 +1,7 @@
-import kotlinx.coroutines.async
+package kotlinx.coroutines
+
 import java.util.*
 import java.util.concurrent.CompletableFuture
-
-// === Async generators ===
-interface AsyncIterator<T> {
-    fun hasNext(): CompletableFuture<Boolean>
-    fun next(): T
-}
-
-interface AsyncSequence<T> {
-    fun iterator(): AsyncIterator<T>
-}
 
 fun <Element> asyncGenerate(
         coroutine c: AsyncGeneratorController<Element>.() -> Continuation<Unit>) =
@@ -192,50 +183,4 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
             else -> throw IllegalStateException("Unexpected state ${state}")
         }
     }
-}
-
-fun <T> work(t: T) = async<T> {
-    t
-}
-
-fun <T> AsyncSequence<T>.forEach(body: (T) -> Unit): CompletableFuture<Unit> {
-    return async<Unit> {
-        val iterator = iterator()
-        while (await(iterator.hasNext())) {
-            body(iterator.next())
-        }
-    }
-}
-
-fun <T> AsyncSequence<T>.toList(expectedSize: Int = -1): CompletableFuture<List<T>> {
-    return async {
-        val result = if (expectedSize >= 0) ArrayList<T>(expectedSize) else ArrayList()
-        val iterator = iterator()
-        while (await(iterator.hasNext())) {
-            result += iterator.next()
-        }
-        result.trimToSize()
-        result
-    }
-//    forEach {
-//        result += it
-//    }.get()
-//    result.trimToSize()
-//    return result
-}
-
-fun main(args: Array<String>) {
-    println("At least this")
-
-    val ag = asyncGenerate<String> {
-        yield("Start")
-        val first = await(work(1))
-        val second = await(work("second: $first"))
-        yield("Continue")
-        yield(second)
-    }
-
-    ag.forEach {
-        println(it)
-    }.get()
 }
