@@ -55,16 +55,16 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
     private var currentHashNext: CompletableFuture<Boolean>? = null
     private var exception: Throwable? = null
 
-    private val maybeValue = ArrayList<E>()
+    private var value: E? = null
 
-    private var maybeContinuation = ArrayList<Continuation<Unit>>()
+    private var continuation: Continuation<Unit>? = null
 
     // This method is available in a generator in a yielding invocation
     // An argument to the parameter `continuation` is provided by the compiler
     suspend fun yield(element: E, continuation: Continuation<Unit>): Unit {
         assert(state == State.RUNNING)
-        maybeValue.push(element)
-        maybeContinuation.push(continuation)
+        value = element
+        this.continuation = continuation
         state = State.HAS_VALUE
 
         completeWithCurrentState(currentHashNext)
@@ -104,15 +104,14 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
     private fun step() {
         assert(state == State.READY)
         state = State.RUNNING
-        val continuation = maybeContinuation.pop()
+        val continuation = this.continuation!!
         continuation.resume(Unit)
     }
 
     private fun fetchValue(): E {
         assert(state == State.HAS_VALUE)
-        assert(maybeValue.size == 1)
         state = State.READY
-        return maybeValue.pop()
+        return value as E
     }
 
     private fun dropValue(): Unit {
@@ -194,9 +193,6 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
         }
     }
 }
-
-private fun <T> ArrayList<T>.push(t: T) = add(t)
-private fun <T> ArrayList<T>.pop() = removeAt(lastIndex)
 
 fun <T> work(t: T) = async<T> {
     t
