@@ -52,7 +52,7 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
 
     private var state = State.INITIAL
 
-    private var currentHashNext: CompletableFuture<Boolean>? = null
+    private var currentHasNext: CompletableFuture<Boolean>? = null
     private var exception: Throwable? = null
 
     private var value: E? = null
@@ -67,7 +67,7 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
         this.continuation = continuation
         state = State.HAS_VALUE
 
-        completeWithCurrentState(currentHashNext)
+        completeWithCurrentState(currentHasNext)
     }
 
     // TODO: add sync shortcut for completed tasks
@@ -86,13 +86,13 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
     // Can be used to the effect similar to `yield break` in C#
     operator fun handleResult(result: Unit, c: Continuation<Nothing>) {
         state = State.STOPPED
-        completeWithCurrentState(currentHashNext)
+        completeWithCurrentState(currentHasNext)
     }
 
     operator fun handleException(e: Throwable, c: Continuation<Nothing>) {
         state = State.EXCEPTION
         exception = e
-        completeWithCurrentState(currentHashNext)
+        completeWithCurrentState(currentHasNext)
     }
 
     private fun start() {
@@ -121,13 +121,13 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
     override fun hasNext(): CompletableFuture<Boolean> {
         when (state) {
             State.INITIAL -> {
-                assert(currentHashNext == null)
+                assert(currentHasNext == null)
 
                 val result = CompletableFuture<Boolean>()
 
                 // TODO: this runs on the caller thread, but should probably be run on the thread pool
                 start()
-                currentHashNext = completeWithCurrentState(result)
+                currentHasNext = completeWithCurrentState(result)
 
                 return result
             }
@@ -137,7 +137,7 @@ class AsyncGeneratorController<E> : AsyncIterator<E> {
 
                 // TODO: this runs on the caller thread, but should probably be run on the thread pool
                 step()
-                currentHashNext = completeWithCurrentState(result)
+                currentHasNext = completeWithCurrentState(result)
 
                 return result
             }
