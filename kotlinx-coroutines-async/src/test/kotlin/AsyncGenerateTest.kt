@@ -1,6 +1,7 @@
 package kotlinx.coroutines
 
 import org.junit.Test
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import kotlin.test.assertEquals
@@ -121,4 +122,72 @@ class AsyncGenerateTest {
             assertEquals("OK", cause.message)
         }
     }
+
+    @Test
+    fun testComplexAsyncYield() {
+        // This test tries all permutations of up to a given number of the following operations:
+        //   y - yield
+        //   a - await
+        //   ya - yield(await(...))
+
+        val options = listOf("y", "ya", "a")
+        val maxLength = 6
+        for (i in 0..Math.pow(options.size.toDouble(), maxLength.toDouble()).toInt() - 1) {
+            doComplexTest(i, options, maxLength)
+        }
+
+        // When this test fails, it prints a "number" and a "length" in the assertion message
+        // To run that particular failed case, call
+        //     doComplexTest(number, options, maxLength, length)
+    }
+
+    private fun doComplexTest(number: Int, options: List<String>, maxLength: Int, singleLength: Int = -1) {
+        // Form a permutation of [options] with the given [number], where number=0 means "all first items"
+        val commands = ArrayList<String>()
+        var pow = 1
+        for (i in 1..maxLength) {
+            commands.add(options[number / pow % options.size])
+            pow *= options.size
+        }
+
+        fun runCommandsAndCheckResult(commands: List<String>, number: Int) {
+            val expected = ArrayList<String>()
+            for ((i, c) in commands.withIndex()) {
+                when (c) {
+                    "y", "ya" -> expected.add("$i")
+                    "a" -> { /*skip*/ }
+                    else -> fail("Unrecognized instruction: $c")
+                }
+            }
+
+            fun <T> work(t: T) = async<T> { t }
+            val aseq = asyncGenerate<String> {
+                for ((i, command) in commands.withIndex()) {
+                    when (command) {
+                        "y" -> yield("$i")
+                        "a" -> await(work(i))
+                        "ya" -> yield(await(work("$i")))
+                        else -> fail("Unrecognized instruction: $command")
+                    }
+                }
+            }
+
+            assertEquals(
+                    expected,
+                    aseq.toList().get(),
+                    "Test number $number failed. Commands: $commands, length: ${commands.size}"
+            )
+        }
+
+        if (singleLength <= 0) {
+            // Normal operation
+            for (i in 1..commands.size) {
+                runCommandsAndCheckResult(commands.take(i), number)
+            }
+        } else {
+            // Run single test, for debugging
+            runCommandsAndCheckResult(commands.take(singleLength), number)
+        }
+    }
+
 }
