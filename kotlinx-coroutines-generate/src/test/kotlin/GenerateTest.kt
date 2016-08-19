@@ -1,5 +1,5 @@
-
 import kotlinx.coroutines.generate
+import org.junit.Assert
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertEquals
@@ -271,5 +271,31 @@ class GenerateTest {
                 effects.toList()
         )
     }
-}
 
+    @Test
+    fun testDeeplyNestedYieldAll_has_to_be_fast() {
+        val timestamp = System.nanoTime()
+
+        var result = sequenceOf<Int>()
+
+        // This creates a chain of iterators that's 1000 levels deep.
+        // A naïve implementation of generate() makes iteration very slow in this case
+        for (i in 1..1000) {
+            val resultValue = result
+            result = generate<Int> {
+                yieldAll(resultValue)
+                yieldAll((1..5).toList())
+            }
+        }
+        val expected = generate<Int> {
+            for (i in 1..1000) {
+                yieldAll((1..5).toList())
+            }
+        }
+        Assert.assertEquals(expected.toList(), result.toList())
+
+        val timeDelta = System.nanoTime() - timestamp
+
+        assertTrue(timeDelta < 1e9, "Test took too long: slow implementation of generate()?")
+    }
+}
