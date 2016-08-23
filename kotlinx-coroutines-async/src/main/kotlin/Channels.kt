@@ -12,8 +12,7 @@ interface OutputChannel<in T> {
     fun send(data: T, continuation: () -> Unit, exceptionalContinuation: (Throwable) -> Unit)
 }
 
-// TODO: Which threads to run handlers on?
-class SimpleChannel<T> : InputChannel<T>, OutputChannel<T> {
+class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>, OutputChannel<T> {
     companion object {
         private val STATE_UPDATER = AtomicReferenceFieldUpdater.newUpdater(SimpleChannel::class.java, Any::class.java, "state")
     }
@@ -43,15 +42,16 @@ class SimpleChannel<T> : InputChannel<T>, OutputChannel<T> {
 
         when (oldState) {
             State.NoValue -> {}
-            is State.SenderRegistered -> exceptionalContinuation(
-                IllegalStateException("Illegal attempt by \"$continuation\" to send while another sender \"${oldState.senderContinuation}\" is waiting")
+            is State.SenderRegistered -> runner.run(
+                    exceptionalContinuation,
+                    IllegalStateException("Illegal attempt by \"$continuation\" to send while another sender \"${oldState.senderContinuation}\" is waiting")
             )
-            is State.SenderWaiting<*> -> exceptionalContinuation(
-                IllegalStateException("Illegal attempt by \"$continuation\" to send while another sender \"${oldState.senderContinuation}\" is waiting")
+            is State.SenderWaiting<*> -> runner.run(
+                    exceptionalContinuation,
+                    IllegalStateException("Illegal attempt by \"$continuation\" to send while another sender \"${oldState.senderContinuation}\" is waiting")
             )
             is State.ReceiverWaiting<*> -> {
-                // TODO: Run on sender's thread
-                continuation()
+                runner.run(continuation)
             }
         }
     }
@@ -74,9 +74,8 @@ class SimpleChannel<T> : InputChannel<T>, OutputChannel<T> {
                 IllegalStateException("Illegal attempt by \"$continuation\" to send while another sender \"${oldState.senderContinuation}\" is waiting")
             )
             is State.ReceiverWaiting<*> -> {
-                // TODO: Run on receiver's thread
                 @Suppress("UNCHECKED_CAST")
-                (oldState as State.ReceiverWaiting<T>).receiverContinuation(data)
+                runner.run((oldState as State.ReceiverWaiting<T>).receiverContinuation, data)
             }
         }
     }
@@ -93,20 +92,18 @@ class SimpleChannel<T> : InputChannel<T>, OutputChannel<T> {
 
         when (oldState) {
             State.NoValue -> {}
-            is State.ReceiverWaiting<*> -> exceptionalContinuation(
+            is State.ReceiverWaiting<*> -> runner.run(
+                    exceptionalContinuation,
                     IllegalStateException(
                         "Illegal attempt by \"$continuation\" to receive when another reader \"${oldState.receiverContinuation}\" is waiting"
                     )
             )
-            // TODO: Execute on the sender's thread/scheduler
-            is State.SenderRegistered -> oldState.senderContinuation()
+            is State.SenderRegistered -> runner.run(oldState.senderContinuation)
             is State.SenderWaiting<*> -> {
-                // TODO: Execute on receiver's thread
                 @Suppress("UNCHECKED_CAST")
-                continuation(oldState.valueSent as T)
+                runner.run(continuation, oldState.valueSent as T)
 
-                // TODO: Execute on sender's thread
-                oldState.senderContinuation()
+                runner.run(oldState.senderContinuation)
             }
         }
     }
