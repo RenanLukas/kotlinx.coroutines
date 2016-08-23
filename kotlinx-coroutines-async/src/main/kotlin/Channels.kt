@@ -1,3 +1,5 @@
+package kotlinx.channels
+
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater
 
 interface InputChannel<out T> {
