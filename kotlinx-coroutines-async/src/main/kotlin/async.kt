@@ -1,5 +1,7 @@
 package kotlinx.coroutines
 
+import kotlinx.channels.InputChannel
+import kotlinx.channels.OutputChannel
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousFileChannel
@@ -156,5 +158,13 @@ class FutureController<T>(
         override fun failed(exc: Throwable, attachment: Nothing?) {
             c.resumeWithException(exc)
         }
+    }
+
+    suspend fun <T> InputChannel<T>.receive(c: Continuation<T>) {
+        this.receive({ c.resume(it) }, { c.resumeWithException(it) })
+    }
+
+    suspend fun <T> OutputChannel<T>.send(data: T, c: Continuation<Unit>) {
+        this.send(data, { c.resume(Unit) }, { c.resumeWithException(it) })
     }
 }
