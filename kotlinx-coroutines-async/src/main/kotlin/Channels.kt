@@ -110,3 +110,31 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
         }
     }
 }
+
+class SelectBuilder {
+    private val handlers = hashMapOf<InputChannel<*>, Function1<*, Unit>>()
+
+    fun <T> on(c: InputChannel<T>, handler: (T) -> Unit) {
+        if (c in handlers) throw IllegalStateException("Two handlers registered for the same channel: $c")
+        handlers[c] = handler
+    }
+
+    fun <T> on(vararg cs: InputChannel<T>, handler: (T) -> Unit) {
+        for (c in cs) {
+            on(c, handler)
+        }
+    }
+
+    fun run(continuation: () -> Unit, exceptionalContinuation: (Throwable) -> Unit) {
+        for ((channel, handler) in handlers) {
+            channel.receive(
+                    {
+                        @Suppress("UNCHECKED_CAST")
+                        (handler as (Any?) -> Unit).invoke(it)
+                        continuation()
+                    },
+                    exceptionalContinuation
+            )
+        }
+    }
+}

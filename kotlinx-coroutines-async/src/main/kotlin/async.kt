@@ -2,6 +2,7 @@ package kotlinx.coroutines
 
 import kotlinx.channels.InputChannel
 import kotlinx.channels.OutputChannel
+import kotlinx.channels.SelectBuilder
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousFileChannel
@@ -166,5 +167,11 @@ class FutureController<T>(
 
     suspend fun <T> OutputChannel<T>.send(data: T, c: Continuation<Unit>) {
         this.send(data, { c.resume(Unit) }, { c.resumeWithException(it) })
+    }
+
+    suspend fun select(body: SelectBuilder.() -> Unit, c: Continuation<Unit>) {
+        val builder = SelectBuilder()
+        body(builder)
+        builder.run({ c.resume(Unit) }, { c.resumeWithException(it) })
     }
 }
