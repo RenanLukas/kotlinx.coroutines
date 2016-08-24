@@ -78,6 +78,7 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
             is State.ReceiverWaiting<*> -> {
                 @Suppress("UNCHECKED_CAST")
                 runner.run((oldState as State.ReceiverWaiting<T>).receiverContinuation, data)
+                runner.run(continuation)
             }
         }
     }
@@ -104,7 +105,6 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
             is State.SenderWaiting<*> -> {
                 @Suppress("UNCHECKED_CAST")
                 runner.run(continuation, oldState.valueSent as T)
-
                 runner.run(oldState.senderContinuation)
             }
         }
