@@ -162,16 +162,34 @@ class FutureController<T>(
     }
 
     suspend fun <T> InputChannel<T>.receive(c: Continuation<T>) {
-        this.receive({ c.resume(it) }, { c.resumeWithException(it) })
+        this.receive {
+            data, exception ->
+            if (exception == null)
+                c.resume(data as T)
+            else
+                c.resumeWithException(exception)
+        }
     }
 
     suspend fun <T> OutputChannel<T>.send(data: T, c: Continuation<Unit>) {
-        this.send(data, { c.resume(Unit) }, { c.resumeWithException(it) })
+        this.send(data) {
+            exception ->
+            if (exception == null)
+                c.resume(Unit)
+            else
+                c.resumeWithException(exception)
+        }
     }
 
     suspend fun select(body: SelectBuilder.() -> Unit, c: Continuation<Unit>) {
         val builder = SelectBuilder()
         body(builder)
-        builder.run({ c.resume(Unit) }, { c.resumeWithException(it) })
+        builder.run {
+            exception ->
+            if (exception == null)
+                c.resume(Unit)
+            else
+                c.resumeWithException(exception)
+        }
     }
 }
