@@ -3,6 +3,7 @@ package kotlinx.coroutines
 import kotlinx.channels.InputChannel
 import kotlinx.channels.OutputChannel
 import kotlinx.channels.SelectBuilder
+import kotlinx.channels.SubscriptionToken
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousFileChannel
@@ -162,23 +163,23 @@ class FutureController<T>(
     }
 
     suspend fun <T> InputChannel<T>.receive(c: Continuation<T>) {
-        this.receive {
+        this.receive({
             data, exception ->
             if (exception == null)
                 c.resume(data as T)
             else
                 c.resumeWithException(exception)
-        }
+        }, SubscriptionToken.AlwaysActive)
     }
 
     suspend fun <T> OutputChannel<T>.send(data: T, c: Continuation<Unit>) {
-        this.send(data) {
+        this.send(data, {
             exception ->
             if (exception == null)
                 c.resume(Unit)
             else
                 c.resumeWithException(exception)
-        }
+        }, SubscriptionToken.AlwaysActive)
     }
 
     suspend fun select(body: SelectBuilder.() -> Unit, c: Continuation<Unit>) {

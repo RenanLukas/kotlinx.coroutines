@@ -7,15 +7,15 @@ typealias ReceiveHandler<T> = (data: T?, exception: Throwable?) -> Unit
 typealias SendHandler = (Throwable?) -> Unit
 
 interface InputChannel<out T> {
-    fun receive(handler: ReceiveHandler<T>)
+    fun receive(handler: ReceiveHandler<T>, token: SubscriptionToken)
 }
 
 interface OutputChannel<in T> {
     // This function is needed to support the case when the sender doesn't want to start computing anything before some
     // receiver wants the first computed value
-    fun registerSender(handler: SendHandler)
+    fun registerSender(handler: SendHandler, token: SubscriptionToken)
 
-    fun send(data: T, handler: SendHandler)
+    fun send(data: T, handler: SendHandler, token: SubscriptionToken)
 }
 
 class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>, OutputChannel<T> {
@@ -37,7 +37,7 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
     @Volatile
     private var state: Any = State.NoValue
 
-    override fun registerSender(handler: SendHandler) {
+    override fun registerSender(handler: SendHandler, token: SubscriptionToken) {
         val oldState = STATE_UPDATER.getAndAccumulate(this, handler) {
             _state, _continuation ->
             when (_state) {
@@ -62,7 +62,7 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
         }
     }
 
-    override fun send(data: T, handler: SendHandler) {
+    override fun send(data: T, handler: SendHandler, token: SubscriptionToken) {
         val oldState = STATE_UPDATER.getAndAccumulate(this, State.SenderWaiting(data, handler)) {
             _state, _senderWaiting ->
             when (_state as State) {
@@ -88,7 +88,7 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
         }
     }
 
-    override fun receive(handler: ReceiveHandler<T>) {
+    override fun receive(handler: ReceiveHandler<T>, token: SubscriptionToken) {
         val oldState = STATE_UPDATER.getAndAccumulate(this, handler) {
             _state, _continuation ->
             when (_state) {
@@ -119,6 +119,9 @@ class SimpleChannel<T>(val runner: Runner = SynchronousRunner) : InputChannel<T>
 
 class SelectBuilder {
     private typealias OnHandler<T> = (T) -> Unit
+
+    private val token = SimpleSubscriptionToken()
+
     private val handlers = hashMapOf<InputChannel<*>, OnHandler<*>>()
 
     fun <T> on(c: InputChannel<T>, handler: OnHandler<T>) {
@@ -147,7 +150,7 @@ class SelectBuilder {
                     continuation(exception)
                 }
             })
-            channel.receive(wrapped)
+            channel.receive(wrapped, token)
         }
     }
 }
