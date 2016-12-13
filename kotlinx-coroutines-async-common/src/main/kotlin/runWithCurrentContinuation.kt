@@ -25,7 +25,7 @@ private class SafeContinuation<in T>(val delegate: Continuation<T>) : Continuati
     }
 
     fun returnResult(): Any? {
-        if (result.get() == Undecided) result.compareAndSet(Undecided, Suspend)
+        if (result.get() == Undecided) result.compareAndSet(Undecided, SUSPENDED)
         val result = result.get()
         if (result is Fail) throw result.e else return result
     }
